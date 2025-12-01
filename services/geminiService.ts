@@ -1,11 +1,9 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Safely access process.env to prevent crashes in environments where process is undefined
-const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) ? process.env.API_KEY : '';
+// Safely access environment variables for Gemini API
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
-// Only initialize if we have a key (or handle it gracefully in calls)
-// Note: The SDK requires an API key in the constructor if you plan to use it.
+// Only initialize if we have a key
 const ai = new GoogleGenAI({ apiKey: apiKey || 'dummy-key-to-prevent-crash' });
 
 // Helper to check if key is present

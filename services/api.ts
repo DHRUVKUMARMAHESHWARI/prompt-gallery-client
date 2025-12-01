@@ -9,6 +9,28 @@ const getHeaders = () => {
   };
 };
 
+const handleResponse = async (res: Response) => {
+  const text = await res.text();
+  
+  // Log for debugging
+  console.log('Response Status:', res.status);
+  console.log('Response Text:', text);
+  
+  if (!res.ok) {
+    try {
+      throw JSON.parse(text);
+    } catch {
+      throw new Error(`Server error (${res.status}): ${text.substring(0, 100)}`);
+    }
+  }
+  
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+  }
+};
+
 export const api = {
   auth: {
     login: async (email, password) => {
@@ -17,8 +39,7 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      if (!res.ok) throw await res.json();
-      return res.json();
+      return handleResponse(res);
     },
     register: async (name, email, password) => {
       const res = await fetch(`${API_URL}/auth/register`, {
@@ -26,8 +47,7 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password })
       });
-      if (!res.ok) throw await res.json();
-      return res.json();
+      return handleResponse(res);
     },
     getMe: async () => {
       const res = await fetch(`${API_URL}/auth/me`, {

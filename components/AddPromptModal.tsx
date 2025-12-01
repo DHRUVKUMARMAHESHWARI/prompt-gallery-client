@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Wand2, Loader2, Save, Check, Variable } from 'lucide-react';
 import { Prompt } from '../types';
@@ -31,20 +30,29 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
   useEffect(() => {
     if (isOpen) {
       if (editPrompt) {
-        setTitle(editPrompt.title);
-        setContent(editPrompt.content);
-        setSelectedSpace(editPrompt.spaceId);
-        setTags(editPrompt.tags);
+        setTitle(editPrompt.title || '');
+        setContent(editPrompt.content || '');
+        setSelectedSpace(editPrompt.spaceId || '');
+        setTags(editPrompt.tags || []);
       } else {
         setTitle('');
         setContent('');
-        setSelectedSpace(activeSpaceId !== 'all' && activeSpaceId !== 'favorites' ? activeSpaceId : spaces[0].id);
+        
+        // Defensive check: ensure spaces array exists and has items
+        const defaultSpaceId = 
+          spaces && spaces.length > 0 && activeSpaceId !== 'all' && activeSpaceId !== 'favorites'
+            ? activeSpaceId
+            : spaces && spaces.length > 0
+            ? spaces[0]?.id
+            : '';
+        
+        setSelectedSpace(defaultSpaceId);
         setTags([]);
       }
       setVariations([]);
       setIncrementVersion(false);
     }
-  }, [isOpen, editPrompt, activeSpaceId]);
+  }, [isOpen, editPrompt, activeSpaceId, spaces]);
 
   // Real-time variable detection
   useEffect(() => {
@@ -59,7 +67,10 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
   }, [content]);
 
   const handleSave = () => {
-    if (!title.trim() || !content.trim()) return;
+    if (!title.trim() || !content.trim() || !selectedSpace) {
+      alert('Please fill in all required fields');
+      return;
+    }
 
     if (editPrompt) {
       updatePrompt(editPrompt.id, {
@@ -67,7 +78,7 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
         content,
         spaceId: selectedSpace,
         tags,
-        version: incrementVersion ? editPrompt.version + 1 : editPrompt.version,
+        version: incrementVersion ? (editPrompt.version || 0) + 1 : editPrompt.version,
         variables: detectedVariables
       });
     } else {
@@ -100,8 +111,13 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
       }
       
       const result = await enhancePrompt(content);
-      setContent(result.optimized);
-      setTags([...new Set([...tags, ...result.tags])]);
+      if (result) {
+        setContent(result.optimized || content);
+        setTags([...new Set([...tags, ...(result.tags || [])])]);
+      }
+    } catch (error) {
+      console.error('Enhance error:', error);
+      alert('Failed to enhance prompt');
     } finally {
       setIsAiLoading(false);
     }
@@ -123,14 +139,17 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
           }
 
           const vars = await generateVariations(content);
-          setVariations(vars);
+          setVariations(vars || []);
+      } catch (error) {
+        console.error('Variations error:', error);
+        alert('Failed to generate variations');
       } finally {
           setIsAiLoading(false);
       }
   }
 
   const handleTagKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && currentTag) {
+      if (e.key === 'Enter' && currentTag.trim()) {
           e.preventDefault();
           if (!tags.includes(currentTag)) {
               setTags([...tags, currentTag]);
@@ -140,6 +159,9 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
   }
 
   if (!isOpen) return null;
+
+  // Ensure spaces is not undefined
+  const safeSpaces = spaces || [];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -173,21 +195,25 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
             {/* Space Selection */}
             <div>
                 <label className="block text-sm font-medium text-gray-400 mb-2">Space</label>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {spaces.map(space => (
+                {safeSpaces.length > 0 ? (
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {safeSpaces.map(space => (
                         <button
-                            key={space.id}
-                            onClick={() => setSelectedSpace(space.id)}
+                            key={space?.id}
+                            onClick={() => setSelectedSpace(space?.id || '')}
                             className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                                selectedSpace === space.id 
+                                selectedSpace === space?.id 
                                 ? `bg-white text-black` 
                                 : 'bg-white/5 text-gray-400 hover:bg-white/10'
                             }`}
                         >
-                            {space.name}
+                            {space?.name || 'Unnamed'}
                         </button>
                     ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-400">No spaces available. Create one first.</div>
+                )}
             </div>
 
             {/* Inputs */}
@@ -295,7 +321,7 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
 
         {/* Footer */}
         <div className="p-4 md:p-6 border-t border-white/5 bg-white/5 flex flex-col-reverse md:flex-row items-center justify-between gap-3 shrink-0">
-             {editPrompt ? (
+             {editPrompt && editPrompt.id ? (
                 <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer hover:text-white transition-colors select-none group w-full md:w-auto">
                     <div className={`w-5 h-5 rounded border border-white/20 flex items-center justify-center transition-all ${incrementVersion ? 'bg-neon-blue border-neon-blue' : 'bg-black/20 group-hover:border-white/40'}`}>
                         {incrementVersion && <Check size={12} className="text-black" />}
@@ -306,7 +332,7 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
                         onChange={(e) => setIncrementVersion(e.target.checked)}
                         className="hidden"
                     />
-                    <span>Save as <span className="font-mono text-neon-blue font-bold">v{editPrompt.version + 1}</span></span>
+                    <span>Save as <span className="font-mono text-neon-blue font-bold">v{(editPrompt.version || 0) + 1}</span></span>
                 </label>
              ) : (
                  <div className="hidden md:block"/>
@@ -318,7 +344,7 @@ const AddPromptModal: React.FC<Props> = ({ isOpen, onClose, editPrompt }) => {
                 </button>
                 <button 
                     onClick={handleSave}
-                    disabled={!title || !content}
+                    disabled={!title || !content || !selectedSpace}
                     className="flex-1 md:flex-none px-6 py-2.5 rounded-xl font-medium bg-gradient-to-r from-neon-blue to-neon-purple text-black hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     <Save size={18} />

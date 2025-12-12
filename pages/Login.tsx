@@ -82,9 +82,9 @@ const Login = () => {
           Don't have an account? <Link to="/register" className="text-neon-blue hover:underline">Create one</Link>
         </p>
         
-        <div className="mt-6 pt-6 border-t border-white/5 text-center">
+        {/* <div className="mt-6 pt-6 border-t border-white/5 text-center">
              <p className="text-xs text-gray-600">Test Mode: User: <span className="font-mono text-gray-400">root</span> / Pass: <span className="font-mono text-gray-400">root123</span></p>
-        </div>
+        </div> */}
       </div>
     </div>
   );

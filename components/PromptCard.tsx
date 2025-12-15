@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Copy, Star, Edit2, Trash2, Check, GitBranch, Zap, Terminal, Maximize2, Minimize2, Settings2, Play, X, Loader2, Sparkles } from 'lucide-react';
+import { Copy, Star, Edit2, Trash2, Check, GitBranch, Zap, Terminal, Maximize2, Minimize2, Settings2, Play, X, Loader2, Sparkles, ThumbsUp, ThumbsDown, Activity } from 'lucide-react';
 import { Prompt, Space } from '../types';
 import { useStore } from '../context/StoreContext';
 import { runPrompt } from '../services/geminiService';
 import { motion, AnimatePresence } from 'framer-motion';
+import UsageSignalToast from './UsageSignalToast';
 
 interface PromptCardProps {
     prompt: Prompt;
@@ -13,11 +14,12 @@ interface PromptCardProps {
 }
 
 const PromptCard: React.FC<PromptCardProps> = ({ prompt, space, onEdit }) => {
-    const { toggleFavorite, deletePrompt, useAICredit, user } = useStore();
+    const { toggleFavorite, deletePrompt, useAICredit, user, signalPromptUsage, sessionInteractedPromptIds } = useStore();
     const [copied, setCopied] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const [variableValues, setVariableValues] = useState<Record<string, string>>({});
     const [copyMode, setCopyMode] = useState<'RAW' | 'COMPILED'>('COMPILED');
+    const [showSignalToast, setShowSignalToast] = useState(false);
 
     // Runner State
     const [isRunning, setIsRunning] = useState(false);
@@ -58,6 +60,20 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, space, onEdit }) => {
         }).join('');
     };
 
+    const triggerUsageSignal = () => {
+        // If already interacted in this session, don't show toast
+        if (sessionInteractedPromptIds.includes(prompt.id)) return;
+
+        setTimeout(() => {
+            setShowSignalToast(true);
+        }, 2000);
+    };
+
+    const handleSignal = (signal: 'THUMBS_UP' | 'THUMBS_DOWN' | 'NOT_SURE', note?: string) => {
+        signalPromptUsage(prompt.id, signal, note);
+        setShowSignalToast(false);
+    };
+
     const handleCopy = (e: React.MouseEvent) => {
         e.stopPropagation();
 
@@ -70,6 +86,7 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, space, onEdit }) => {
         navigator.clipboard.writeText(textToCopy);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+        triggerUsageSignal();
     };
 
     const handleRun = async (e: React.MouseEvent) => {
@@ -129,7 +146,12 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, space, onEdit }) => {
             <div className={`absolute bottom-0 left-0 w-3 h-3 border-l border-b transition-colors duration-300 rounded-bl-lg ${expanded ? 'border-neon-blue' : 'border-white/10 group-hover:border-white/30'}`} />
             <div className={`absolute bottom-0 right-0 w-3 h-3 border-r border-b transition-colors duration-300 rounded-br-lg ${expanded ? 'border-neon-blue' : 'border-white/10 group-hover:border-white/30'}`} />
 
-            <div className="p-5 flex flex-col h-full" onClick={() => !expanded && setExpanded(true)}>
+            <div className="p-5 flex flex-col h-full" onClick={() => {
+                if (!expanded) {
+                    setExpanded(true);
+                    triggerUsageSignal();
+                }
+            }}>
 
                 {/* Header */}
                 <div className="flex justify-between items-start mb-4">
@@ -151,12 +173,33 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, space, onEdit }) => {
                                 </span>
                             )}
                             <span>{new Date(prompt.updatedAt).toLocaleDateString()}</span>
+                            {(prompt.usageStats?.thumbsUp || 0) > 0 || (prompt.usageStats?.thumbsDown || 0) > 0 ? (
+                                <>
+                                    <span className="w-1 h-1 rounded-full bg-gray-600 mx-1"></span>
+                                    <span className="flex items-center gap-2 text-gray-400">
+                                        <span className="flex items-center gap-1"><ThumbsUp size={10} /> {prompt.usageStats?.thumbsUp || 0}</span>
+                                        <span className="flex items-center gap-1"><ThumbsDown size={10} /> {prompt.usageStats?.thumbsDown || 0}</span>
+                                    </span>
+                                    {prompt.usageStats?.lastWorked && (
+                                        <>
+                                            <span className="w-1 h-1 rounded-full bg-gray-600 mx-1"></span>
+                                            <span className="flex items-center gap-1 text-[10px] text-gray-500">
+                                                <Activity size={10} /> Last worked: {new Date(prompt.usageStats.lastWorked).toLocaleDateString()}
+                                            </span>
+                                        </>
+                                    )}
+                                </>
+                            ) : null}
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
                         <button
-                            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (!expanded) triggerUsageSignal();
+                                setExpanded(!expanded);
+                            }}
                             className="p-2 rounded-lg hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
                         >
                             {expanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
@@ -385,7 +428,13 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, space, onEdit }) => {
                     </div>
                 </div>
             </div>
-        </motion.div>
+
+            <UsageSignalToast
+                visible={showSignalToast}
+                onSignal={handleSignal}
+                onDismiss={() => setShowSignalToast(false)}
+            />
+        </motion.div >
     );
 };
 

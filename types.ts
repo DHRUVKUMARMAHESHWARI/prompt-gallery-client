@@ -23,6 +23,11 @@ export interface Prompt {
   isFavorite: boolean; // Computed on frontend based on current user
   version: number;
   variables?: string[];
+  usageStats?: {
+    thumbsUp: number;
+    thumbsDown: number;
+    lastWorked?: number | string;
+  };
 }
 
 export interface Space {

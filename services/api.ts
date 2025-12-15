@@ -11,11 +11,11 @@ const getHeaders = () => {
 
 const handleResponse = async (res: Response) => {
   const text = await res.text();
-  
+
   // Log for debugging
   console.log('Response Status:', res.status);
   console.log('Response Text:', text);
-  
+
   if (!res.ok) {
     try {
       const error = JSON.parse(text);
@@ -24,7 +24,7 @@ const handleResponse = async (res: Response) => {
       throw new Error(`Server error (${res.status}): ${text.substring(0, 100)}`);
     }
   }
-  
+
   try {
     return JSON.parse(text) || {};
   } catch {
@@ -229,6 +229,22 @@ export const api = {
       } catch (error) {
         console.error('Toggle favorite error:', error);
         throw error;
+      }
+    },
+    signalUsage: async (id: string, signal: 'THUMBS_UP' | 'THUMBS_DOWN' | 'NOT_SURE', note?: string) => {
+      if (!id) throw new Error('Prompt ID is required');
+      try {
+        const res = await fetch(`${API_URL}/prompts/${id}/usage-signal`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ signal, note })
+        });
+        // Handle success silently as per requirements
+        return res.ok;
+      } catch (error) {
+        console.error('Signal usage error:', error);
+        // Silent fail
+        return false;
       }
     }
   },
